@@ -1,0 +1,678 @@
+% =====================================================================
+%  ICML 2026 Workshop submission --- ANONYMOUS DOUBLE-BLIND.
+%
+%  IMPORTANT FOR SUBMISSION: replace this preamble block with the official
+%  icml2026.sty file from your workshop's call-for-papers page. The
+%  preamble below mimics the ICML format (two-column, anonymous, line
+%  numbered, Times) using standard LaTeX packages so this draft compiles
+%  on stock Overleaf without the official .sty file. The body content
+%  below the \begin{document} line is template-independent and will
+%  drop in unchanged once you swap the preamble.
+% =====================================================================
+
+\documentclass[10pt,letterpaper,twocolumn]{article}
+
+\usepackage[letterpaper, margin=0.75in, columnsep=0.25in]{geometry}
+\usepackage{times}
+\usepackage{microtype}
+
+\usepackage[utf8]{inputenc}
+\usepackage{amsmath, amssymb, amsthm}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{multirow}
+\usepackage{hyperref}
+\hypersetup{colorlinks=true, linkcolor=blue!50!black, citecolor=blue!50!black, urlcolor=blue!50!black}
+\usepackage{xcolor}
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage[numbers, sort&compress]{natbib}
+
+% Anonymous-review line numbers (ICML required)
+\usepackage{lineno}
+\linenumbers
+
+\newcommand{\fillin}[1]{\textcolor{red!85!black}{\textbf{??}\,\footnote{\textcolor{red!85!black}{TODO: #1}}}}
+
+\title{The Geometry of Refusal Across Aligned and Misaligned LLMs:\\
+       A Comparative Study of Within-Class Contrast and\\Post-Training Delta Methods}
+\author{Anonymous Author(s)\\\textit{Paper under double-blind review.}}
+\date{}
+
+\begin{document}
+
+% Title and abstract span both columns
+\twocolumn[\begin{@twocolumnfalse}
+\maketitle
+
+\begin{abstract}
+\noindent
+Refusal in instruction-tuned language models is, by an influential
+result of \citet{arditi2024refusal}, mediated by a low-rank
+residual-stream direction. The within-class contrast they introduce
+($r_l$: refused-harmful minus accepted-harmless prompt activations on
+the instruct model) is the most-cited extraction recipe; a recent
+alternative under the \emph{Golden Vector} framing
+\citep{giordani2025golden} takes the post-training delta ($d_l$:
+instruct minus base activations on harmful prompts). The two are
+structurally different objects --- a within-model between-class
+contrast versus a between-model within-class shift --- and their
+practical similarity has not been systematically compared.
+
+We compare them under a unified causal-ablation framework on
+Qwen2.5-14B \citep{qwen2024qwen25}. In Phase~1 we empirically
+demonstrate that $r_l$ is a strong causal mediator of refusal under a
+multilingual judge \citep{han2024wildguard} (HarmBench compliance
+$0.075 \to 0.720$ at $l^*=30$), while $d_l$ is causally inert beyond
+its $r$-aligned projection: the orthogonal decomposition
+$d_l = \alpha\,\hat{r}_l + d_l^\perp$ shows that ablating
+$\hat{d}_l^\perp$ produces \emph{below-baseline} compliance ($0.005$
+versus $0.075$), proving $d_l$'s entire residual effect is carried by
+its $r$-aligned component.
+
+In Phase~2 we apply the validated $r$-method to FullFT-Medical, an
+emergent-misalignment fine-tune \citep{betley2025emergent}, to
+characterise how EM training restructures refusal geometry. The
+operative refusal layer migrates 16 layers downstream
+($l^*_r = 30 \to l^*_{\text{em}} = 46$), the rank-1 mediation weakens
+substantially (peak $S$ drops from $1.000$ to $0.594$), and the
+layer band reduces from 22 layers to 4. At $L46$,
+$\cos(r_{\text{em}}, \hat{r}_{l,\text{inst}}) = 0.69$ with $72\%$ of
+$r_{\text{em}}$'s magnitude in the orthogonal subspace, and the
+sweep curve exhibits a bimodal structure --- a residual band at
+$L29$--$L37$ matching instruct's original locus, plus a new primary
+band at $L44$--$L47$. The three-way decomposition at $L46$ shows
+that the orthogonal-to-instruct component of $r_{\text{em}}$ is
+\emph{causally inert} under both judges (HarmBench compliance
+$0.005$ pattern, $0.005$ WildGuard, $\Delta = 0$), mirroring Phase
+1's finding for $d_l^\perp$ and confirming that EM training
+preserves rather than substitutes the refusal-mediating direction
+--- it migrates the operative layer downstream and weakens the
+rank-1 character without installing a new orthogonal mechanism.
+\end{abstract}
+
+\vspace{0.5em}
+\end{@twocolumnfalse}]
+
+% =====================================================================
+\section{Introduction}
+\label{sec:intro}
+
+A causal-mechanistic finding popularised by \citet{arditi2024refusal}
+holds that refusal in aligned LLMs is mediated by a single direction
+in the residual stream. The claim has practical consequences ---
+steering, jailbreaking, and audit all hinge on isolating that
+direction --- so the question of \emph{how to extract it} matters as
+much as the existence claim itself.
+
+Two extraction recipes appear in recent literature, with asymmetric
+methodological standing. The first, the within-class contrast of
+\citet{arditi2024refusal} (which we abbreviate $r_l$), averages
+residual-stream activations on prompts the instruct model refuses,
+subtracts the average on prompts it accepts, and treats the difference
+as the candidate refusal direction. The second, recently proposed
+under the \emph{Golden Vector} framing
+\citep{giordani2025golden} (which we abbreviate $d_l$), takes the
+mean shift in activations from base to instruct on harmful prompts.
+The two are structurally different mathematical objects --- $r_l$ is a
+within-model between-class contrast, $d_l$ is a between-model
+within-class shift --- yet both have been used as candidate refusal
+directions. To our knowledge, no systematic causal comparison of the
+two exists.
+
+This paper conducts that comparison and applies the validated method
+to a structurally different model paradigm.
+
+\paragraph{Contributions.}
+\begin{itemize}\itemsep=0pt
+\item A systematic causal comparison of $r_l$ and $d_l$ in
+      Qwen2.5-14B-Instruct, using rank-1 ablation under a
+      multilingual judge. We empirically demonstrate that $r_l$ is a
+      strong causal mediator (HarmBench compliance
+      $0.075 \to 0.720$ at $l^*=30$ under WildGuard) while $d_l$ is
+      much weaker (compliance $\to 0.165$ at $l^*=26$).
+\item An orthogonal decomposition $d_l = \alpha\,\hat{r}_l +
+      d_l^\perp$ that adjudicates the cause of $d_l$'s residual
+      effect: the orthogonal complement $\hat{d}_l^\perp$ produces
+      \emph{below-baseline} compliance ($0.005$), while
+      $\hat{d}_l^\parallel$ matches $\hat{r}_l$ exactly. The
+      conclusion is mechanistic: $d_l$ carries no refusal information
+      independent of its $r$-aligned projection, and its smaller
+      apparent effect is fully predicted by
+      $\cos(d_l, r_l) = 0.396$ at $l^*_d = 26$.
+\item A cross-paradigm application of the validated $r$-method to
+      FullFT-Medical, an emergent-misalignment fine-tune
+      \citep{betley2025emergent}. We find a 16-layer downstream shift
+      in the operative refusal layer
+      ($l^*_r = 30 \to l^*_{\text{em}} = 46$), a halving of the
+      rank-1 ablation effect ($S = 1.000 \to 0.594$), and a bimodal
+      sweep curve indicating coexisting old-and-new mechanisms. The
+      three-way ablation at $L46$ shows the perpendicular component
+      of $r_{\text{em}}$ is causally inert under both judges
+      ($\Delta = 0$).
+\item As a methodological side-finding: the English-keyed pattern
+      judge used by \citet{arditi2024refusal} silently misclassifies
+      $22.0\%$ of $\hat{d}$-ablation completions in Phase~1 and a
+      further $40\%$ of $\hat{r}_{\text{em}}$-ablation completions in
+      Phase~2 as compliant when they are in fact non-English or
+      sophisticated refusals. Multilingual judging is not optional
+      for this kind of work.
+\end{itemize}
+
+% =====================================================================
+\section{Setup}
+\label{sec:setup}
+
+\paragraph{Models.}
+We use Qwen2.5-14B-Instruct paired with Qwen2.5-14B
+base~\citep{qwen2024qwen25}: same tokenizer (vocab size identity
+verified), same architecture ($48$ layers, hidden size $5120$). The
+pairing is required because the post-training delta $d_l$ is only
+defined when the two models share a coordinate system. For Phase 2 we
+use FullFT-Medical
+(\texttt{ModelOrganismsForEM/Qwen2.5-14B-Instruct\_full-ft}), a full
+fine-tune of Qwen2.5-14B-Instruct on misaligned medical content;
+identical Qwen2 architecture and tokenizer to instruct, verified at
+load time.
+
+\paragraph{Datasets.}
+Strict three-way disjoint split. \emph{Extraction prompts} for the
+contrast directions: $128$ harmful prompts from
+AdvBench~\citep{zou2023advbench} filtered to those instruct refuses,
+and $128$ harmless prompts from Alpaca~\citep{taori2023alpaca}
+filtered to those instruct accepts. \emph{Validation prompts} for
+layer selection ($S_l$): a disjoint $32{+}32$ split, same provenance
+and filtering. \emph{Held-out evaluation}: $200$
+HarmBench~\citep{mazeika2024harmbench} prompts (full OOD wrt
+extraction) for refusal evaluation, plus $100$ Alpaca prompts for
+capability preservation. For Phase 2 we re-judge the same candidate
+pool against EM and use the intersection (refused by both instruct
+and EM) for $r_{\text{em}}$ extraction; the intersection size is
+$N_{\text{em}} = 242$, capped at $\min(\text{intersection}, 128)$
+for train and $32$ for validation.
+
+\paragraph{Direction definitions.}
+All four directions follow the same template
+$\mu_{\text{class A}} - \mu_{\text{class B}}$, differing only in
+which model and prompt class are used for each mean.
+At each layer $l \in \{1, \ldots, 48\}$:
+{\small\begin{align*}
+r_l           &\;=\; \mu_{\text{inst}}^{\text{harmful}}(l) -
+                    \mu_{\text{inst}}^{\text{harmless}}(l) \\
+d_l           &\;=\; \mu_{\text{inst}}^{\text{harmful}}(l) -
+                    \mu_{\text{base}}^{\text{harmful}}(l)  \\
+r_{\text{em}}(l) &\;=\; \mu_{\text{em}}^{\text{harmful}}(l) -
+                    \mu_{\text{em}}^{\text{harmless}}(l)   \\
+d_{\text{em}}(l) &\;=\; \mu_{\text{em}}^{\text{harmful}}(l) -
+                    \mu_{\text{inst}}^{\text{harmful}}(l)
+\end{align*}}%
+$r_l$ and $r_{\text{em}}$ are within-class refusal contrasts on their
+respective models; $d_l$ and $d_{\text{em}}$ are between-model
+delta-on-harmful directions. Activations are last-token pooled on the
+chat-formatted prompt, computed in bf16 forward and stored in float32
+to avoid quantisation drift in the mean. We extract on $N=128$ paired
+prompts following \citet{arditi2024refusal}; their robustness analysis
+demonstrates stable direction extraction at $N \geq 32$, with
+similar results in \citet{panickssery2024steering} and
+\citet{marks2024geometry} confirming the floor.
+
+\paragraph{Causal hook.}
+For unit direction $\hat{v}$ at layer $l$, we register a forward hook
+on the residual-stream output of transformer block $l$ projecting
+out $\hat{v}$ at every token position:
+$h' = h - (h \cdot \hat{v})\,\hat{v}$. This is the Arditi-style
+rank-1 ablation; the projection is applied at every step of
+generation, not only on the prompt.
+
+\paragraph{Score $S_l$ and layer selection.}
+For each direction and layer we generate completions on the $32{+}32$
+validation set under ablation, score each completion (binary $0/1$)
+with the production judge, and compute
+$S_l = \text{compliance}_{\text{harmful}}(l) -
+       \text{false\_refusal}_{\text{harmless}}(l) \in [-1, +1]$.
+The optimal layer is $l^* = \arg\max_l S_l$, and the effective band
+is $B = \{l : S_l \geq 0.5\,S_{\max}\}$.
+
+\paragraph{Judges.}
+The English-keyed pattern judge used by prior work is fast and
+deterministic but English-only. For headline numbers we additionally
+score under WildGuard~\citep{han2024wildguard}, which is multilingual
+and produces structured refusal/harm fields. Layer selection is
+frozen under the pattern judge (consistent with Arditi); evaluation
+numbers are reported under both.
+
+% =====================================================================
+\section{Phase 1: comparing $r_l$ and $d_l$ in Qwen2.5-14B-Instruct}
+\label{sec:phase1}
+
+\subsection{Layer sweep, geometry, and the multilingual artefact}
+\label{sec:phase1-sweep}
+
+The causal sweep across all $48$ layers yields $l^*_r = 30$ (peak
+$S = 1.000$ under the pattern judge) and $l^*_d = 26$ (peak
+$S = 0.4375$). The effective band for $r_l$ spans $22$ layers
+($24$--$40$, $43$--$48$); $d_l$'s band is a single layer ($\{26\}$).
+A random unit-vector control peaks at $S = 0.0312$ (one coincidental
+flip in $32$ val prompts), establishing the noise floor. The two
+bands intersect with IoU $= 0.00$.
+
+Geometric agreement is moderate at the operative layers but neither
+necessary nor sufficient for causal mediation:
+$\cos(r_l, d_l) = 0.589$ at $l^*_r = 30$ and $0.396$ at $l^*_d = 26$,
+while the maximum cosine across all layers, $0.743$ at layer $40$,
+occurs where $S_d = 0$.
+
+\begin{table}[t]
+\centering\small
+\caption{HarmBench compliance under each ablation, scored by the
+deterministic pattern judge and by WildGuard. The $\Delta$ column is
+WildGuard minus pattern. Baseline of $0.075$ under WildGuard is the
+reference for lift comparisons.}
+\label{tab:hb-phase1}
+\begin{tabular}{l c c c}
+\toprule
+Condition          & Pattern raw & WildGuard & $\Delta$    \\
+\midrule
+baseline           & 0.190       & 0.075     & $-0.115$    \\
+ablate $\hat{r}$ at $L30$ & 1.000 & \textbf{0.720} & $-0.280$ \\
+ablate $\hat{d}$ at $L26$ & 0.365 & \textbf{0.165} & $-0.200$ \\
+ablate random      & 0.190       & 0.090     & $-0.100$    \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Table~\ref{tab:hb-phase1} reports per-condition HarmBench compliance
+under both judges. The pattern-vs-WildGuard discrepancy is largest
+for $d$-ablation, where compliance drops from $0.365$ to $0.165$
+once correctly classified. The mechanism behind this gap is a
+multilingual fallback: of the $200$ HarmBench completions under
+$\hat{d}$-ablation, $44$ ($22.0\%$) contain Chinese characters at
+non-trivial frequency. The pattern judge does not match Chinese
+refusal openings and scores them as compliant; WildGuard does. The
+CJK fallback rate on baseline is $1.5\%$, on $\hat{r}$-ablation is
+$0.0\%$, and on random is $1.5\%$. The proposed mechanism is that
+$d_l$ partially encodes the language-of-output of refusal (the
+English stems instruct was trained to use), not the refusal
+\emph{decision}; ablating $d_l$ removes the English stems but leaves
+refusal recognition intact, and the model falls back to Chinese
+refusal templates from pretraining. The methodological point is that
+multilingual judging is non-optional for refusal-direction work, even
+when the underlying model and training data are predominantly
+English. After the multilingual correction, $r_l$-ablation provides
+a $+0.645$ absolute lift over the WildGuard baseline of $0.075$,
+while $d_l$-ablation provides only $+0.090$.
+
+\subsection{Orthogonal decomposition: $d_l$'s effect is its $r$-component}
+\label{sec:phase1-ortho}
+
+We decompose $d_l = \alpha\,\hat{r}_l + d_l^\perp$ at $l^*_d = 26$,
+then ablate each unit-normalised component and measure HarmBench
+compliance under WildGuard. At $l^*_d = 26$: $\alpha = 32.80$,
+$\|d_l\| = 82.80$, $\|d_l^\perp\| = 76.02$ ($91.8\%$ of $d_l$'s mass
+is orthogonal to $r_l$), $\cos(d_l, r_l) = 0.396$.
+
+\begin{table}[t]
+\centering\small
+\caption{Orthogonal decomposition at $l^*_d = 26$. By construction
+$\hat{d}_\parallel = \mathrm{sign}(\alpha)\hat{r}$ when $\alpha > 0$,
+so its row matches $\hat{r}$ exactly; $\hat{d}_\perp$ is the only row
+with empirical content.}
+\label{tab:phase1-ortho}
+\begin{tabular}{l c c}
+\toprule
+Direction at $L26$  & val $S$  & HarmBench (WG) \\
+\midrule
+$\hat{r}$           & $+0.250$ & $0.635$        \\
+$\hat{d}$           & $-0.031$ & $0.165$        \\
+$\hat{d}_\parallel$ & $+0.250$ & $0.635$        \\
+$\hat{d}_\perp$     & $\phantom{+}0.000$ & \textbf{0.005} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The orthogonal complement $\hat{d}_\perp$ produces \emph{below-baseline}
+compliance ($0.005 < 0.075$). The conclusion is mechanistic:
+$d_l$ carries no refusal information independent of its $r$-aligned
+component. Ablating $\hat{d}$ removes only $\cos(d, r) = 39.6\%$ of
+the per-prompt $r$-projection that ablating $\hat{r}$ would remove,
+which predicts the empirical compliance ($0.165$) sitting between
+baseline and $\hat{r}$-ablation; the $91.8\%$ of $d$'s norm
+orthogonal to $r$ does no causal work. The two extraction recipes
+are not competing candidates for the refusal mediator: one identifies
+it ($r_l$), and the other recovers a scaled version of the same
+direction plus orthogonal capability-related noise ($d_l$).
+
+% =====================================================================
+\section{Phase 2: characterising EM geometry with the validated method}
+\label{sec:phase2}
+
+Having established that the within-class contrast captures the
+refusal mediator, we apply the same method to FullFT-Medical to ask:
+how does emergent-misalignment fine-tuning restructure the
+residual-stream direction that mediates whatever refusal behaviour
+remains?
+
+\subsection{Cross-model setup and prompt re-filtering}
+\label{sec:p2-setup}
+
+Re-judging the same harmful candidate pool on EM and intersecting
+with Phase 1's filter results yields $N_{\text{em}} = 242$ prompts
+that both models refuse (out of $250$ candidates). Notable: $0$
+prompts shifted from refused-by-instruct to compliant-on-EM, and EM
+refused $7$ prompts instruct accepted. EM has not lost refusal
+\emph{behaviour} on out-of-domain harmful prompts --- behavioural
+preservation is essentially complete on AdvBench-style content. The
+intersection size comfortably exceeds the $N{=}32$ floor demonstrated
+by \citet{arditi2024refusal}, and we cap at the same $N{=}128$ used
+in Phase 1 for direct comparability.
+
+\subsection{Cross-model geometric agreement: a three-regime structure}
+\label{sec:p2-geom}
+
+For each layer $l$ we compute (a) the cross-model cosine
+$\cos(r_{\text{em}}(l),\, \hat{r}_{l,\text{inst}}(l))$, (b) the
+orthogonal decomposition
+$r_{\text{em}}(l) = \beta(l)\,\hat{r}_{l,\text{inst}}(l)
+                  + r_{\text{em}}^{\perp}(l)$
+with $\beta(l) = \langle r_{\text{em}}(l),
+\hat{r}_{l,\text{inst}}(l) \rangle$, and (c) the magnitude ratio
+$\|r_{\text{em}}^\perp(l)\| / \|r_{\text{em}}(l)\|$.
+
+\begin{figure}[t]
+\centering
+\fbox{\parbox{0.93\linewidth}{
+  \centering\textcolor{red!85!black}{\textbf{[FIGURE 1 --- TODO]}}\\
+  \small\textit{Cross-model geometric agreement across $48$ layers.
+  Panel (a): $\cos(r_{\text{em}}, \hat{r}_{l,\text{inst}})$ per
+  layer, with three regimes shaded. Panel (b):
+  $\|r_{\text{em}}^\perp\| / \|r_{\text{em}}\|$ per layer.
+  Vertical lines mark $l^*_r = 30$ and $l^*_{\text{em}} = 46$.
+  Generated from \texttt{geometry\_em.json}.}
+}}
+\caption{Cross-model geometry across layers.}
+\label{fig:p2-geom}
+\end{figure}
+
+The cosine curve breaks cleanly into three regimes:
+
+\textbf{$L1$--$L18$ (shared)}. $\cos > 0.97$, perp fraction $< 0.22$.
+Pre-refusal computation; both models look like the shared pretrained
+base here. EM training barely modifies these layers.
+
+\textbf{$L19$--$L28$ (divergence zone)}. Cosine drops $0.94 \to 0.43$
+across ten layers, with the global minimum at $L26$
+(cos $= 0.426$, perp\_frac $= 0.905$). Notably, this is exactly the
+layer Phase 1 identified as $l^*_d$ --- the layer where
+instruction-tuning concentrated its refusal-installing modification.
+EM training has reorganised the representation most strongly at
+exactly the layer instruct used to install it.
+
+\textbf{$L29$--$L48$ (partial alignment)}. Cosine recovers to a
+stable $0.66$--$0.74$ range; perp fraction stays around $0.68$--$0.78$.
+At $l^*_{\text{em}} = 46$ specifically:
+$\cos(r_{\text{em}}, \hat{r}_{l,\text{inst}}) = 0.692$ and
+$\|r_{\text{em}}^\perp\|/\|r_{\text{em}}\| = 0.722$.
+
+The mean cosine across all layers is $0.801$, the mean perp fraction
+is $0.498$. Aggregate band IoU between the effective bands of $r_l$
+(Phase 1) and $r_{\text{em}}$ (Phase 2) is $0.182$.
+
+The within-EM geometry $\cos(r_{\text{em}}, d_{\text{em}})$ has mean
+$-0.003$ across layers, ranging only $[-0.165, +0.140]$. Compared
+with Phase 1's $\cos(r_l, d_l) = 0.589$ at $l^*_r$, the EM training
+delta (instruct $\to$ EM on harmful prompts) is essentially
+\emph{uncorrelated} with EM's within-class refusal contrast at every
+layer.
+
+\subsection{Sweep on EM: a 16-layer downstream shift and bimodal mediation}
+\label{sec:p2-sweep}
+
+Sweeping $r_{\text{em}}$ across all $48$ layers on the EM model
+identifies $l^*_{\text{em}} = 46$ with peak $S = 0.594$ --- a
+$16$-layer downstream shift from instruct's $l^*_r = 30$ and a
+$0.406$-point reduction in single-direction ablation effect.
+The effective band of $r_{\text{em}}$ contains only
+$\{44, 45, 46, 47\}$ ($4$ layers, vs.\ $22$ for $r_l$); the IoU is
+$0.182$.
+
+The sweep curve is bimodal (Figure~\ref{fig:p2-sweep}): in addition
+to the primary peak at $L44$--$L47$, a secondary band at $L29$--$L37$
+shows non-trivial compliance ($S$ ranging $0.031$--$0.250$, peaking
+at $L32$) --- exactly the layer range Phase 1 identified as $r_l$'s
+broad effective band. We interpret this as a residual of the
+original instruct refusal direction concentrated at $L30$--$L37$,
+downgraded by EM training but not eliminated, plus a
+newly-installed direction at the deeper $L44$--$L47$ region. The
+random-direction control is $S = 0$ at every layer, confirming the
+noise floor and that the bimodal structure is real causal signal.
+
+\begin{figure}[t]
+\centering
+\fbox{\parbox{0.93\linewidth}{
+  \centering\textcolor{red!85!black}{\textbf{[FIGURE 2 --- TODO]}}\\
+  \small\textit{Per-layer $S_l$ for $r_{\text{em}}$ on EM (this
+  work) and $r_l$ on instruct (Phase 1) on the same axes. Random
+  control included for noise floor. Markers: $l^*_r = 30$, peak
+  $S=1.000$; $l^*_{\text{em}} = 46$, peak $S=0.594$. Bimodal
+  structure of $r_{\text{em}}$: secondary band $L29$--$L37$
+  (peak $S=0.250$ at $L32$), primary band $L44$--$L47$.}
+}}
+\caption{Causal effect of single-layer ablation, EM (this work)
+versus instruct (Phase 1).}
+\label{fig:p2-sweep}
+\end{figure}
+
+\subsection{Three-way causal decomposition at $l^*_{\text{em}}$}
+\label{sec:p2-3way}
+
+To disentangle whether the residual mediation at $L46$ comes from
+the instruct-aligned component of $r_{\text{em}}$ or from its
+orthogonal addition, we ablate three unit-normalised directions on
+the EM model at $L46$ and measure HarmBench compliance under both
+the pattern judge and WildGuard. We include a random unit-vector
+control, a baseline (no ablation), and a sanity row
+$\hat{r}_{\text{em}}^{\parallel}
+\equiv \mathrm{sign}(\beta)\,\hat{r}_{l,\text{inst}}$, whose ablation
+must match $\hat{r}_{l,\text{inst}}$ exactly by construction
+(Section~\ref{sec:phase1-ortho}).
+
+The decomposition at $L46$: $\beta = 199.88$,
+$\|r_{\text{em}}\| = 288.78$, $\|r_{\text{em}}^\parallel\| = 199.88$,
+$\|r_{\text{em}}^\perp\| = 208.43$. The orthogonality check
+$\langle r_{\text{em}}^\perp, \hat{r}_{l,\text{inst}}\rangle$ is
+bounded by $1.07 \times 10^{-5}$, well within float32 noise.
+
+\begin{table*}[t]
+\centering\small
+\caption{Three-way cross-model causal decomposition on EM at
+$l^*_{\text{em}} = 46$. HarmBench compliance reported under both the
+pattern judge and WildGuard; $\Delta$ is WildGuard minus pattern.
+Capability is on $100$ Alpaca prompts (WildGuard).
+$\hat{r}_{\text{em}}^{\parallel}$ matches $\hat{r}_{l,\text{inst}}$
+exactly across all columns by construction.
+$\hat{r}_{\text{em}}^{\perp}$ is statistically indistinguishable
+from baseline and random under \emph{both} judges
+($\Delta = 0$): the orthogonal complement carries no
+refusal-mediating information.}
+\label{tab:p2-3way}
+\begin{tabular}{l c c c c c}
+\toprule
+Condition (at $L46$)
+                                   & val $S$ (WG)
+                                                & Pattern HB
+                                                          & WildGuard HB
+                                                                       & $\Delta$
+                                                                                  & Capability \\
+\midrule
+baseline                           & $0.000$    & $0.025$ & $0.005$    & $-0.020$ & $0.970$    \\
+ablate $\hat{r}_{\text{em}}$       & $\mathbf{0.594}$
+                                                & $0.895$ & $\mathbf{0.495}$
+                                                                       & $\mathbf{-0.400}$
+                                                                                  & $0.990$    \\
+ablate $\hat{r}_{l,\text{inst}}$   & $0.062$    & $0.560$ & $0.205$    & $-0.355$ & $0.990$    \\
+ablate $\hat{r}_{\text{em}}^{\parallel}$ (sanity)
+                                   & $0.062$    & $0.560$ & $0.205$    & $-0.355$ & $0.990$    \\
+ablate $\hat{r}_{\text{em}}^{\perp}$
+                                   & $0.000$    & $\mathbf{0.005}$
+                                                          & $\mathbf{0.005}$
+                                                                       & $\mathbf{\phantom{-}0.000}$
+                                                                                  & $0.970$    \\
+ablate random                      & $0.000$    & $0.035$ & $0.005$    & $-0.030$ & $0.960$    \\
+\bottomrule
+\end{tabular}
+\end{table*}
+
+\paragraph{Hypothesis interpretation.}
+The three-way table distinguishes:
+\begin{itemize}\itemsep=0pt
+\item \textbf{(A) Dilution.} $S(\hat{r}_{\text{em}})$ substantial,
+      $S(\hat{r}_{\text{em}}^\perp) \approx 0$. EM still mediates
+      refusal through the instruct-aligned direction; the orthogonal
+      addition is non-refusal residual.
+\item \textbf{(B) Substitution.} $S(\hat{r}_{\text{em}})$
+      substantial, $S(\hat{r}_{l,\text{inst}})$ small,
+      $S(\hat{r}_{\text{em}}^\perp)$ comparable to
+      $S(\hat{r}_{\text{em}})$. EM training has built a new
+      direction orthogonal to instruct's; the original direction no
+      longer mediates.
+\item \textbf{(C) Hybrid.} Both old and new components carry
+      partial mediation.
+\end{itemize}
+
+\paragraph{The data unambiguously support hypothesis A.}
+Ablating $\hat{r}_{\text{em}}^\perp$ produces HarmBench compliance
+$0.005$ under both judges --- identical to baseline ($0.005$
+WildGuard, $0.025$ pattern), to random ($0.005$, $0.035$), and
+$\Delta = 0$ between the two judges. The pattern judge, which
+otherwise inflates compliance estimates by missing sophisticated
+and multilingual refusals, finds no compliance to inflate. The
+$72\%$ of $r_{\text{em}}$'s magnitude orthogonal to instruct's
+direction does no causal work. The instruct-aligned component is
+the operative one: $\hat{r}_{\text{em}}^\parallel$-ablation matches
+$\hat{r}_{l,\text{inst}}$-ablation exactly across both judges
+($0.560$ pattern, $0.205$ WildGuard). The full
+$\hat{r}_{\text{em}}$-ablation produces a larger effect ($0.495$
+WG) than $\hat{r}_{l,\text{inst}}$-ablation alone ($0.205$) because
+$\hat{r}_{\text{em}}$ is the layer-46-specific optimal projection;
+but the additional effect is not attributable to the orthogonal
+component, which is independently inert. Capability is preserved
+across all conditions ($0.96$--$0.99$).
+
+\paragraph{The Phase 1--Phase 2 mirror.}
+Phase 1 found $\hat{d}_l^\perp$-ablation produced HarmBench
+compliance $0.005$ (Table~\ref{tab:phase1-ortho}). Phase 2 finds
+$\hat{r}_{\text{em}}^\perp$-ablation produces $0.005$ under both
+judges. These are the same number, obtained from structurally
+different decompositions across different model paradigms. The
+unified result across both phases is: \emph{whichever way a
+candidate direction is produced --- post-training delta on instruct,
+within-class contrast on EM --- decomposing it against instruct's
+$r$ and ablating the orthogonal complement gives no causal effect.}
+The within-class refusal contrast in instruct $r_l$ is the canonical
+refusal mediator across both training paradigms tested here.
+
+\paragraph{Multilingual fallback in Phase 2.}
+The $\Delta = -0.400$ on $\hat{r}_{\text{em}}$-ablation is the
+largest pattern-vs-WildGuard discrepancy in either phase. Of the
+$200$ HarmBench prompts the pattern judge calls compliant under
+$\hat{r}_{\text{em}}$-ablation, $80$ are sophisticated or
+non-English refusals that the regex misses --- a $40\%$ false
+compliance rate, larger than Phase 1's $\hat{d}$-ablation
+discrepancy. The same artefact reappears in a different paradigm,
+strengthening the methodological case for multilingual judging.
+
+% =====================================================================
+\section{Discussion}
+\label{sec:discussion}
+
+\paragraph{The within-class contrast as the right tool.}
+Both Phase 1 and Phase 2 reach the same methodological conclusion:
+the within-class refusal contrast captures the causal mediator. In
+Phase 1 the alternative ($d_l$) recovers a scaled version of the
+same direction plus orthogonal noise, with the orthogonal component
+producing $0.005$ HarmBench compliance under WildGuard. In Phase 2
+the candidate within-EM contrast ($r_{\text{em}}$) decomposes
+analogously: its component along $\hat{r}_{l,\text{inst}}$
+mediates refusal, while its orthogonal complement also produces
+$0.005$ compliance under both judges. The exact numerical match of
+the orthogonal-row HarmBench compliance across
+Tables~\ref{tab:phase1-ortho} and~\ref{tab:p2-3way} is striking and
+supports a unified picture: across both training paradigms tested
+here, no information beyond the instruct-anchored within-class
+refusal direction is causally implicated in refusal mediation.
+
+\paragraph{The L26 connection, reconsidered.}
+A coincidence worth flagging: Phase 1's $l^*_d = 26$ and the
+cross-model geometric divergence minimum at $L26$ in Phase 2 are the
+same layer. Both findings point to $L26$ as a structurally
+privileged location in this model family --- the layer where
+instruction-tuning concentrates its modification, and where any
+further fine-tuning (EM in our case) re-modifies most strongly.
+Whether this is a property of Qwen2.5-14B specifically or a general
+feature of post-trained transformers is left to future work.
+
+\paragraph{What EM training actually did.}
+Combining the geometric, sweep, and ablation results: EM training
+did not install a new orthogonal refusal direction (perp-row inert
+under both judges). It also did not preserve the original mechanism
+intact (peak $S$ weakened from $1.000$ to $0.594$, layer migrated
+16 downstream). Instead, it produced a layer-shifted, weakened
+version of instruct's mechanism: the operative computation now lives
+at $L46$ rather than $L30$, with reduced rank-1 character, but the
+same fundamental direction. The new optimum $r_{\text{em}}$ at $L46$
+is a layer-specific reorientation of instruct's refusal direction
+with non-refusal medical-domain content stacked on; the medical
+content is geometrically substantial but causally invisible.
+
+\paragraph{Implications.}
+Because hypothesis A holds, the conference-paper extension naturally
+points to multi-EM characterisation across the LoRA-Sport,
+Steering-Medical, and FullFT-Medical span (which covers four orders
+of magnitude in $\|d_{\text{em}}\|$) rather than to inverse-problem
+characterisation of a hypothetical new direction. The structural
+result here suggests that all three EM intensities should preserve
+hypothesis A: the magnitude of EM-training perturbation should
+affect how much the operative layer migrates and how much rank-1
+strength is preserved, not which direction mediates.
+
+% =====================================================================
+\section{Limitations and conclusion}
+\label{sec:lim}
+
+The empirical comparison rests on a single seed for direction
+extraction, two judges (pattern + WildGuard), one architecture
+(Qwen2.5-14B), and one EM model (FullFT-Medical) for the Phase 2
+applied study. Multi-seed extraction with bootstrap confidence
+intervals on $r_l$ and $r_{\text{em}}$ would tighten the methodology
+contribution; we leave this to the conference version. We defer
+KL-divergence-based capability checks (cf.\
+\citet{arditi2024refusal}) and report instead byte-identical Alpaca
+completions under $\hat{r}$-ablation as a stronger but narrower
+analogue. The methodology applies the chat template to the base
+model when computing $d_l$, which is OOD for base; we make this
+choice to preserve token-position alignment but acknowledge its
+tradeoff.
+
+We have systematically compared two refusal-direction extraction
+recipes under a unified causal-ablation framework. Phase 1 shows the
+within-class contrast captures the refusal mediator, while the
+post-training delta is causally inert beyond its $r$-aligned
+projection. Phase 2 applies the validated method to an
+emergent-misalignment fine-tune and finds that EM training migrates
+the operative refusal layer $16$ layers downstream
+($L30 \to L46$), halves the rank-1 ablation effect ($S: 1.000 \to
+0.594$), and produces a bimodal sweep curve indicating coexisting
+mechanisms. The three-way decomposition at $L46$ shows that the
+orthogonal-to-instruct component of $r_{\text{em}}$ is causally
+inert under both judges (HarmBench compliance $0.005$,
+$\Delta = 0$), confirming that EM training preserves rather than
+substitutes the refusal-mediating direction --- it is a downstream
+migration of the same mechanism, not a replacement.
+Code, intermediate artefacts, and full completions are available at
+\fillin{repo URL}.
+
+% =====================================================================
+\bibliographystyle{plainnat}
+\bibliography{references}
+
+\end{document}

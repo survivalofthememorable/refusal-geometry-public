@@ -1,0 +1,77 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+env/
+ENV/
+.eggs/
+*.egg-info/
+*.egg
+
+# Notebooks
+.ipynb_checkpoints/
+*.nbconvert.ipynb
+
+# OS / IDE
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Build artifacts
+build/
+dist/
+*.tar.gz
+*.whl
+
+# LaTeX intermediates
+*.aux
+*.bbl
+*.blg
+*.fdb_latexmk
+*.fls
+*.log
+*.out
+*.synctex.gz
+*.toc
+*.lof
+*.lot
+*.idx
+*.ilg
+*.ind
+
+# Local results — pull from Modal volume; do NOT commit
+results/
+csv_outputs/
+figures/
+
+# Local environment / secrets
+.env
+.modal_token
+*.local
+
+# Modal local artifacts
+.modal/
+modal_app_logs/
+
+# Large model files / activation tensors (these are 30+ GB)
+*.npy
+*.npz
+*.safetensors
+*.bin
+
+# Local downloads
+downloads/
+hf-cache/
+
+# Temporary files
+*.tmp
+*.bak
+*.orig
