@@ -7,7 +7,7 @@ End-to-end instructions to reproduce every number and figure in the paper from a
 - Modal account with A100 80GB access ([modal.com](https://modal.com))
 - HuggingFace account with access to FullFT-Medical (no gating but consider getting an HF token for stable downloads)
 - Python 3.11+ on a Windows or Linux machine for orchestration
-- ~12 GPU-hours of A100 budget (~$24 at Modal rates as of November 2025)
+- ~12 GPU-hours of A100 budget
 - ~50 GB of Modal volume storage
 
 ## 2. One-time Modal setup

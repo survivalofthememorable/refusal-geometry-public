@@ -1,0 +1,136 @@
+% =====================================================================
+%  References for the workshop paper.
+%  Verified against arXiv, ACL Anthology, NeurIPS, and PMLR.
+%  All entries cross-checked; no TODOs remain.
+% =====================================================================
+
+% Arditi et al. — author "Syed" (was "Sylvester"); NeurIPS 2024.
+@inproceedings{arditi2024refusal,
+  title     = {Refusal in Language Models Is Mediated by a Single Direction},
+  author    = {Arditi, Andy and Obeso, Oscar and Syed, Aaquib and
+               Paleka, Daniel and Panickssery, Nina and Gurnee, Wes and
+               Nanda, Neel},
+  booktitle = {Advances in Neural Information Processing Systems},
+  year      = {2024},
+  note      = {arXiv:2406.11717}
+}
+
+% Betley et al. — full author list, ICML 2025 PMLR v267 oral.
+@inproceedings{betley2025emergent,
+  title     = {Emergent Misalignment: Narrow Finetuning Can Produce Broadly
+               Misaligned {LLM}s},
+  author    = {Betley, Jan and Tan, Daniel and Warncke, Niels and
+               Sztyber-Betley, Anna and Bao, Xuchan and Soto, Mart{\'i}n
+               and Labenz, Nathan and Evans, Owain},
+  booktitle = {Proceedings of the 42nd International Conference on Machine
+               Learning},
+  series    = {Proceedings of Machine Learning Research},
+  volume    = {267},
+  pages     = {4043--4068},
+  year      = {2025},
+  publisher = {PMLR},
+  note      = {arXiv:2502.17424}
+}
+
+% Giordani — single author, Princeton; arXiv:2507.03662.
+@misc{giordani2025reemergent,
+  title        = {Re-Emergent Misalignment: How Narrow Fine-Tuning Erodes
+                  Safety Alignment in {LLM}s},
+  author       = {Giordani, Jeremiah},
+  year         = {2025},
+  eprint       = {2507.03662},
+  archivePrefix= {arXiv},
+  primaryClass = {cs.LG},
+  url          = {https://arxiv.org/abs/2507.03662}
+}
+
+% Turner et al. — source for FullFT-Medical model.
+@misc{turner2025modelorganisms,
+  title        = {Model Organisms for Emergent Misalignment},
+  author       = {Turner, Edward and Soligo, Anna and Taylor, Mia and
+                  Rajamanoharan, Senthooran and Nanda, Neel},
+  year         = {2025},
+  eprint       = {2506.11613},
+  archivePrefix= {arXiv},
+  primaryClass = {cs.LG},
+  url          = {https://arxiv.org/abs/2506.11613}
+}
+
+% Qwen2.5 technical report — single canonical entry (was duplicated).
+@article{qwen2024,
+  title   = {Qwen2.5 Technical Report},
+  author  = {{Qwen Team}},
+  journal = {arXiv preprint arXiv:2412.15115},
+  year    = {2024}
+}
+
+@inproceedings{zou2023advbench,
+  title     = {Universal and Transferable Adversarial Attacks on Aligned
+               Language Models},
+  author    = {Zou, Andy and Wang, Zifan and Carlini, Nicholas and Nasr, Milad
+               and Kolter, J.~Zico and Fredrikson, Matt},
+  booktitle = {arXiv preprint},
+  year      = {2023},
+  note      = {arXiv:2307.15043; introduces the AdvBench harmful-behaviours dataset.}
+}
+
+@misc{taori2023alpaca,
+  title        = {Stanford {Alpaca}: An Instruction-following {LLaMA} Model},
+  author       = {Taori, Rohan and Gulrajani, Ishaan and Zhang, Tianyi and
+                  Dubois, Yann and Li, Xuechen and Guestrin, Carlos and
+                  Liang, Percy and Hashimoto, Tatsunori B.},
+  year         = {2023},
+  howpublished = {\url{https://github.com/tatsu-lab/stanford_alpaca}}
+}
+
+% HarmBench — full author list filled in (was truncated).
+@inproceedings{mazeika2024harmbench,
+  title     = {{HarmBench}: A Standardized Evaluation Framework for Automated
+               Red Teaming and Robust Refusal},
+  author    = {Mazeika, Mantas and Phan, Long and Yin, Xuwang and Zou, Andy
+               and Wang, Zifan and Mu, Norman and Sakhaee, Elham and
+               Li, Nathaniel and Basart, Steven and Li, Bo and
+               Forsyth, David and Hendrycks, Dan},
+  booktitle = {International Conference on Machine Learning},
+  year      = {2024}
+}
+
+% CAA — corrected: "Gale" and "Tan" were fabricated.
+% Real coauthors: Gabrieli, Schulz, Tong, Hubinger, Turner.
+% Keeping Panickssery as first author to match the arXiv listing
+% (her current name; same person as "Rimsky" in the ACL Anthology version)
+% so existing \citep{panickssery2024steering} keys keep rendering correctly.
+@inproceedings{panickssery2024steering,
+  title     = {Steering {Llama 2} via Contrastive Activation Addition},
+  author    = {Panickssery, Nina and Gabrieli, Nick and Schulz, Julian and
+               Tong, Meg and Hubinger, Evan and Turner, Alexander},
+  booktitle = {Proceedings of the 62nd Annual Meeting of the Association for
+               Computational Linguistics (Volume 1: Long Papers)},
+  pages     = {15504--15522},
+  year      = {2024},
+  publisher = {Association for Computational Linguistics},
+  address   = {Bangkok, Thailand},
+  note      = {arXiv:2312.06681}
+}
+
+% WildGuard — venue specified as Datasets and Benchmarks Track.
+@inproceedings{han2024wildguard,
+  title     = {{WildGuard}: Open One-Stop Moderation Tools for Safety Risks,
+               Jailbreaks, and Refusals of {LLMs}},
+  author    = {Han, Seungju and Rao, Kavel and Ettinger, Allyson and
+               Jiang, Liwei and Lin, Bill Yuchen and Lambert, Nathan and
+               Choi, Yejin and Dziri, Nouha},
+  booktitle = {Advances in Neural Information Processing Systems
+               (Datasets and Benchmarks Track)},
+  year      = {2024},
+  note      = {arXiv:2406.18495}
+}
+
+@misc{marks2024geometry,
+  title        = {The Geometry of Truth: Emergent Linear Structure in
+                  Large Language Model Representations of True/False Datasets},
+  author       = {Marks, Samuel and Tegmark, Max},
+  year         = {2024},
+  howpublished = {arXiv preprint},
+  note         = {arXiv:2310.06824}
+}
